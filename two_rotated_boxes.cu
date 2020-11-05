@@ -53,12 +53,14 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
                 cur_emitted = cur_emitted + cur_attenuation * emitted;
                 cur_attenuation = cur_attenuation * attenuation;
                 cur_ray = scattered;
+                // 测试反射率，早点结束，不然文件很大打不开
+                //printf("attenuation: %f, %f, %f\n", attenuation[0], attenuation[1], attenuation[2]);
             }
             else    
             {
                 if (i == 0)
                     return emitted;
-                return cur_emitted + cur_attenuation * emitted; 
+                return (cur_emitted + cur_attenuation * emitted); 
             }
         }
         else 
@@ -129,29 +131,30 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
         material* red = new lambertian(new const_texture(vec3(0.65, 0.05, 0.05)));
         material* white = new lambertian(new const_texture(vec3(0.73, 0.73, 0.73)));
         material* green = new lambertian(new const_texture(vec3(0.12, 0.45, 0.15)));
-        material* light = new diffuse_light(new const_texture(vec3(50, 50, 50)));   // (15,15,15)
+        material* light = new diffuse_light(new const_texture(vec3(15, 15, 15)));   // (15,15,15)
         material* ima = new lambertian(new image_texture(d_texture_data, d_inxyn[0], d_inxyn[1]));
-        material* noise = new lambertian(new noise_texture(&local_rand_state, 2));
+        material* noise = new lambertian(new noise_texture(&local_rand_state, 0.2));
 
-        d_list[0] = new flip_face(new yz_rect(green, 0, 555, 0, 555, 555));
-        d_list[1] = new yz_rect(red, 0, 555, 0, 555, 0);
-        d_list[2] = new xz_rect(light, 213, 343, 227, 332, 554);
-        d_list[3] = new xz_rect(white, 0, 555, 0, 555, 0);
-        d_list[4] = new xz_rect(white, 0, 555, 0, 555, 555);
-        d_list[5] = new xy_rect(noise, 0, 555, 0, 555, 555);
+        d_list[0] = new flip_face(new yz_rect(ima, 0, 555, 0, 555, 555));
+        d_list[1] = new yz_rect(ima, 0, 555, 0, 555, 0);
+        d_list[2] = new xz_rect(light, 150, 400, 150, 400, 554);    // 光源
+        d_list[3] = new xz_rect(noise, 0, 555, 0, 555, 0);
+        d_list[4] = new xz_rect(noise, 0, 555, 0, 555, 555);
+        d_list[5] = new xy_rect(ima, 0, 555, 0, 555, 555);
 
-        // 先旋转再平移，否则无法得到正确的位置（原因：）
-        hittable* box1 = new box(white, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
+        // 先旋转再平移，否则无法得到正确的位置（原因：旋转轴是坐标轴y，所以需要将想作为旋转轴的线与坐标轴重合）
+        hittable* box1 = new box(noise, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
         box1 = new rotate_y(box1, -18);
         d_list[6] = new translate(box1, vec3(130, 0, 65));  //(130,0,65)
-        hittable* box2 = new box(white, vec3(0, 0, 0), vec3(165, 330, 165));      /// (0,0,0) (165,330,165)
+        hittable* box2 = new box(noise, vec3(0, 0, 0), vec3(165, 330, 165));      /// (0,0,0) (165,330,165)
         box2 = new rotate_y(box2, 15);
         d_list[7] = new translate(box2, vec3(265, 0, 295)); // (265,0,295)
+        //d_list[3] = new moving_sphere(noise, vec3(300, 300, 300), vec3(300, 300, 300), 0, 1, 80);
 
         *rand_state = local_rand_state;
         *d_world  = new hittable_list(d_list, 8);
 
-        vec3 lookfrom(278, 278, -800);
+        vec3 lookfrom(278, 278, -800);  // 278, 278, -800
         vec3 lookat(278 , 278, 0);
         float dist_to_focus = 10; (lookfrom-lookat).length();
         float aperture = 0; //0.1
@@ -185,7 +188,7 @@ int main()
 {
     const int nx = 1200;
     const int ny = 1200;
-    const int ns = 100;     // 每个像素内样点数(抗锯齿)
+    const int ns = 200;     // 每个像素内样点数(抗锯齿)
     int tx = 16, ty = 16;
 
     cerr << "Rendering a " << nx << "x" << ny << " image with " << ns << " samples per pixel ";
@@ -214,7 +217,8 @@ int main()
     int *d_inxyn;
     // string不能转换成const char*
     //string image_name = "IMG_20200910_000256.jpg"
-    unsigned char* texture_data = stbi_load("60847663_p0.jpg", &inx, &iny, &inn, 0);
+    //"60847663_p0.jpg"
+    unsigned char* texture_data = stbi_load("IMG_20200910_000256.jpg", &inx, &iny, &inn, 0);
     unsigned char* d_texture_data;
     // 复制图像
     checkCudaErrors(cudaMallocManaged(&d_texture_data, inx * iny * inn * sizeof(unsigned char)));
