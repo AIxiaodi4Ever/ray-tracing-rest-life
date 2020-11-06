@@ -143,10 +143,10 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
 
         d_list[0] = new flip_face(new yz_rect(green, 0, 555, 0, 555, 555));
         d_list[1] = new yz_rect(red, 0, 555, 0, 555, 0);
-        d_list[2] = new xz_rect(light, 213, 343, 227, 332, 554);    // 光源 (150, 400, 150, 400, 554)
+        d_list[2] = new flip_face(new xz_rect(light, 213, 343, 227, 332, 554));    // 光源 (150, 400, 150, 400, 554)
         d_list[3] = new xz_rect(white, 0, 555, 0, 555, 0);
-        d_list[4] = new xz_rect(white, 0, 555, 0, 555, 555);
-        d_list[5] = new xy_rect(white, 0, 555, 0, 555, 555);
+        d_list[4] = new flip_face(new xz_rect(white, 0, 555, 0, 555, 555));
+        d_list[5] = new flip_face(new xy_rect(white, 0, 555, 0, 555, 555));
 
         // 先旋转再平移，否则无法得到正确的位置（原因：旋转轴是坐标轴y，所以需要将想作为旋转轴的线与坐标轴重合）
         hittable* box1 = new box(white, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
