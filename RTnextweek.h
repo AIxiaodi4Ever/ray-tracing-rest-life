@@ -43,6 +43,25 @@ __device__ vec3 random_in_unit_disk(curandState *local_rand_state)
     }
 }
 
+// 获得单位圆表面的随机反射向量（真正的兰贝特分布）
+__host__ __device__ inline vec3 random_unit_vector(curand *local_rand_state) {
+    auto a = curand_uniform(local_rand_state) * 2 * M_PI;
+    auto z = curand_uniform(local_rand_state) * 2 - 1;
+    auto r = sqrt(1 - z * z);
+    return vec3(r * cos(a), r * sin(a), z);
+}
+
+// 获得半圆内均匀分布的随机反射向量 
+__host__ __device__ inline vec3 random_in_hemisphere(const vec3& normal, curand *local_rand_state)
+{   // 使用random_unit_vector()得到错误图像，原因未知
+    //vec3 in_unit_sphere = random_unit_vector();
+    vec3 in_unit_sphere = random_in_unit_sphere(local_rand_state);
+    if (dot(in_unit_sphere, normal) > 0.0)
+        return in_unit_sphere;
+    else
+        return -in_unit_sphere;
+}
+
 __host__ __device__ inline float ffmin(float a, float b) { return a <= b ? a : b; }
 __host__ __device__ inline float ffmax(float a, float b) { return a >= b ? a : b; }
 
