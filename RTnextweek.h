@@ -44,7 +44,7 @@ __device__ vec3 random_in_unit_disk(curandState *local_rand_state)
 }
 
 // 获得单位圆表面的随机反射向量（真正的兰贝特分布）
-__device__ vec3 random_unit_vector(curand *local_rand_state) {
+__device__ vec3 random_unit_vector(curandState *local_rand_state) {
     auto a = curand_uniform(local_rand_state) * 2 * M_PI;
     auto z = curand_uniform(local_rand_state) * 2 - 1;
     auto r = sqrt(1 - z * z);
