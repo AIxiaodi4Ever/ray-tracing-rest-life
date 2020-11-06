@@ -48,13 +48,17 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
             ray scattered;
             vec3 attenuation;
             vec3 emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
-            if(rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, local_rand_state)) 
+            float pdf;
+            if(rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, pdf, local_rand_state)) 
             {
                 cur_emitted = cur_emitted + cur_attenuation * emitted;
-                cur_attenuation = cur_attenuation * attenuation;
+                cur_attenuation = cur_attenuation * attenuation * rec.mat_ptr->scattering_pdf(r, rec, scattered) / pdf;
                 cur_ray = scattered;
                 // 测试反射率，早点结束，不然文件很大打不开
-                //printf("attenuation: %f, %f, %f\n", attenuation[0], attenuation[1], attenuation[2]);
+                /*printf("attenuation: %f, %f, %f\n", attenuation[0], attenuation[1], attenuation[2]);
+                printf("current att: %f, %f, %f\n", cur_attenuation[0], cur_attenuation[1], cur_attenuation[2]);
+                printf("scatter_pdf: %f\n", rec.mat_ptr->scattering_pdf(r, rec, scattered));
+                printf("pdf        : %f\n", pdf);*/
             }
             else    
             {
@@ -131,22 +135,24 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
         material* red = new lambertian(new const_texture(vec3(0.65, 0.05, 0.05)));
         material* white = new lambertian(new const_texture(vec3(0.73, 0.73, 0.73)));
         material* green = new lambertian(new const_texture(vec3(0.12, 0.45, 0.15)));
+
         material* light = new diffuse_light(new const_texture(vec3(15, 15, 15)));   // (15,15,15)
+
         material* ima = new lambertian(new image_texture(d_texture_data, d_inxyn[0], d_inxyn[1]));
         material* noise = new lambertian(new noise_texture(&local_rand_state, 0.2));
 
-        d_list[0] = new flip_face(new yz_rect(ima, 0, 555, 0, 555, 555));
-        d_list[1] = new yz_rect(ima, 0, 555, 0, 555, 0);
-        d_list[2] = new xz_rect(light, 150, 400, 150, 400, 554);    // 光源
-        d_list[3] = new xz_rect(noise, 0, 555, 0, 555, 0);
-        d_list[4] = new xz_rect(noise, 0, 555, 0, 555, 555);
-        d_list[5] = new xy_rect(ima, 0, 555, 0, 555, 555);
+        d_list[0] = new flip_face(new yz_rect(green, 0, 555, 0, 555, 555));
+        d_list[1] = new yz_rect(red, 0, 555, 0, 555, 0);
+        d_list[2] = new xz_rect(light, 213, 343, 227, 332, 554);    // 光源 (150, 400, 150, 400, 554)
+        d_list[3] = new xz_rect(white, 0, 555, 0, 555, 0);
+        d_list[4] = new xz_rect(white, 0, 555, 0, 555, 555);
+        d_list[5] = new xy_rect(white, 0, 555, 0, 555, 555);
 
         // 先旋转再平移，否则无法得到正确的位置（原因：旋转轴是坐标轴y，所以需要将想作为旋转轴的线与坐标轴重合）
-        hittable* box1 = new box(noise, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
+        hittable* box1 = new box(white, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
         box1 = new rotate_y(box1, -18);
         d_list[6] = new translate(box1, vec3(130, 0, 65));  //(130,0,65)
-        hittable* box2 = new box(noise, vec3(0, 0, 0), vec3(165, 330, 165));      /// (0,0,0) (165,330,165)
+        hittable* box2 = new box(white, vec3(0, 0, 0), vec3(165, 330, 165));      /// (0,0,0) (165,330,165)
         box2 = new rotate_y(box2, 15);
         d_list[7] = new translate(box2, vec3(265, 0, 295)); // (265,0,295)
         //d_list[3] = new moving_sphere(noise, vec3(300, 300, 300), vec3(300, 300, 300), 0, 1, 80);

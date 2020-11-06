@@ -113,22 +113,4 @@ __host__ __device__ inline vec3 unit_vector(vec3 v)
     return v / v.length();
 }
 
-// 获得单位圆表面的随机反射向量（真正的兰贝特分布）
-/*__host__ __device__ inline vec3 random_unit_vector() {
-    auto a = random_double(0, 2 * pi);
-    auto z = random_double(-1, 1);
-    auto r = sqrt(1 - z * z);
-    return vec3(r * cos(a), r * sin(a), r);
-}*/
-
-// 获得半圆内均匀分布的随机反射向量 
-/*__host__ __device__ inline vec3 random_in_hemisphere(const vec3& normal)
-{   // 使用random_unit_vector()得到错误图像，原因未知
-    //vec3 in_unit_sphere = random_unit_vector();
-    vec3 in_unit_sphere = random_in_unit_sphere();
-    if (dot(in_unit_sphere, normal) > 0.0)
-        return in_unit_sphere;
-    else
-        return -in_unit_sphere;
-}*/
 #endif

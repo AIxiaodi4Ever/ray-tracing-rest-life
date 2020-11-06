@@ -47,7 +47,16 @@ public:
 
     // 这里认为光线传播的速度为无穷大所以接触时光线的时间与反射后的时间都等于光线最初发射的时间
     __device__ virtual bool scatter(const ray &r_in, const hit_record &rec, vec3 &attenuation, ray &scattered, 
-                                    curandState *local_rand_state) const = 0;
+                                    float &pdf, curandState *local_rand_state) const
+    {
+        return false;
+    }
+
+    // 忘了加virtual导致了一个错误
+    __device__ virtual float scattering_pdf(const ray &r_in, const hit_record &rec, const ray &scattered) const
+    {
+        return 0;
+    }
 };
 
 // 服从兰贝特分布的表面
@@ -58,13 +67,21 @@ public:
     __device__ ~lambertian() { delete albedo; }
 
     __device__ virtual bool scatter(
-            const ray& r_in, const hit_record& rec, vec3& attenuation, ray& scattered, curandState *local_rand_state) 
+            const ray& r_in, const hit_record& rec, vec3& attenuation, ray& scattered, float& pdf, curandState *local_rand_state) 
     const
     {
-        vec3 target = rec.p + rec.normal + random_in_unit_sphere(local_rand_state);
-        scattered = ray(rec.p, target - rec.p, r_in.time());
+        vec3 target = rec.p + rec.normal + random_unit_vector(local_rand_state);
+        scattered = ray(rec.p, unit_vector(target - rec.p), r_in.time());
         attenuation = albedo->value(rec.u, rec.v, rec.p);
+        pdf = dot(rec.normal, unit_vector(scattered.direction())) / M_PI;
         return true;
+    }
+
+    __device__ virtual float scattering_pdf(const ray &r_in, const hit_record &rec, const ray &scattered) const
+    {
+        float cosine = dot(rec.normal, unit_vector(scattered.direction()));
+        return (cosine < 0 ? 0 : cosine / M_PI);
+        //return cosine / M_PI;
     }
 
 public:
