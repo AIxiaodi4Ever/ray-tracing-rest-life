@@ -52,7 +52,7 @@ __device__ vec3 random_unit_vector(curandState *local_rand_state) {
 }
 
 // 获得半圆内均匀分布的随机反射向量 
-__device__ vec3 random_in_hemisphere(const vec3& normal, curand *local_rand_state)
+__device__ vec3 random_in_hemisphere(const vec3& normal, curandState *local_rand_state)
 {   // 使用random_unit_vector()得到错误图像，原因未知
     //vec3 in_unit_sphere = random_unit_vector();
     vec3 in_unit_sphere = random_in_unit_sphere(local_rand_state);
