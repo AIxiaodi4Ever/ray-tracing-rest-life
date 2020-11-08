@@ -5,6 +5,7 @@
 #include "hittable.h"
 #include "RTnextweek.h"
 #include "my_texture.h"
+#include "onb.h"
 
 // 菲涅尔公式的Christophe Schlick近似，获得不同入射角下的反射率
 __device__ float schlick(float cosine, float ref_idx)
@@ -70,10 +71,15 @@ public:
             const ray& r_in, const hit_record& rec, vec3& attenuation, ray& scattered, float& pdf, curandState *local_rand_state) 
     const
     {
-        vec3 target = rec.p + rec.normal + random_unit_vector(local_rand_state);
-        scattered = ray(rec.p, unit_vector(target - rec.p), r_in.time());
+        onb uvw;
+        uvw.build_from_w(rec.normal);
+        vec3 direction = uvw.local(random_cosine_direction(local_rand_state));
+        //vec3 direction = random_in_hemisphere(rec.normal, local_rand_state);
+        scattered = ray(rec.p, unit_vector(direction), r_in.time());
         attenuation = albedo->value(rec.u, rec.v, rec.p);
-        pdf = dot(rec.normal, unit_vector(scattered.direction())) / M_PI;
+        //pdf = dot(rec.normal, unit_vector(scattered.direction())) / M_PI;
+        //pdf = 0.5 / M_PI;
+        pdf = dot(uvw.w(), scattered.direction()) / M_PI; // uvw.w()就是rec.normal，但vuw才是标准正交基。。
         return true;
     }
 

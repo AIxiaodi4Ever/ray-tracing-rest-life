@@ -51,7 +51,7 @@ __device__ vec3 random_unit_vector(curandState *local_rand_state) {
     return vec3(r * cos(a), r * sin(a), z);
 }
 
-// 获得半圆内均匀分布的随机反射向量 
+// 获得半球内均匀分布的随机反射向量 
 __device__ vec3 random_in_hemisphere(const vec3& normal, curandState *local_rand_state)
 {   // 使用random_unit_vector()得到错误图像，原因未知
     //vec3 in_unit_sphere = random_unit_vector();
@@ -60,6 +60,20 @@ __device__ vec3 random_in_hemisphere(const vec3& normal, curandState *local_rand
         return in_unit_sphere;
     else
         return -in_unit_sphere;
+}
+
+// 获得半球表面的满足概率密度p=cos/pi的随机向量
+__device__ inline vec3 random_cosine_direction(curandState *local_rand_state)
+{
+    float r1 = random_float(local_rand_state);
+    float r2 = random_float(local_rand_state);
+    float z = sqrt(1 - r2);
+
+    float phi = 2 * M_PI * r1;
+    float x = cos(phi) * sqrt(r2);
+    float y = sin(phi) * sqrt(r2);
+
+    return vec3(x, y, z);
 }
 
 __host__ __device__ inline float ffmin(float a, float b) { return a <= b ? a : b; }

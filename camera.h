@@ -6,6 +6,7 @@
 #include "ray.h"
 #include "RTnextweek.h"
 
+// 视线是逆着摄像机坐标系(相对坐标系uvw)的w方向，即-w方向追踪的，目的是使取景框的“左下角”lower_left_corner和图像的左下角一致
 class camera {
 public:
     __device__ camera(vec3 lookfrom, vec3 lookat, vec3 vup, float vfov, float aspect, 
@@ -19,7 +20,7 @@ public:
         float half_width = aspect * half_height;
         origin = lookfrom;
         w = unit_vector(lookfrom - lookat);
-        u = unit_vector(cross(vup, w));
+        u = unit_vector(cross(vup, w));     //vup取任意不和w平行的向量即可
         v = cross(w, u);
         lower_left_corner = origin  - half_width*focus_dist*u -half_height*focus_dist*v - focus_dist*w;
         horizontal = 2.0f*half_width*focus_dist*u;
