@@ -41,7 +41,7 @@ class material {
 public:
     __device__ virtual ~material(){}
 
-    __device__ virtual vec3 emitted(float u, float v, const vec3 &p) const
+    __device__ virtual vec3 emitted(const ray& r_in, const hit_record& rec, float u, float v, const vec3 &p) const
     {
         return vec3(0, 0, 0);
     }
@@ -173,9 +173,14 @@ public:
         return false;
     }
 
-    __device__ virtual vec3 emitted(float u, float v, const vec3& p) const 
+    __device__ virtual vec3 emitted(const ray& r_in, const hit_record& rec, float u, float v, const vec3& p) const 
     {
-        return emit->value(u, v, p);
+        // 不知道传入的r_in有什么用
+        // flip_face终于派上用场了
+        if (rec.front_face)
+            return emit->value(u, v, p);
+        else
+            return vec3(0, 0, 0);
     }
 
 public:

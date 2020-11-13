@@ -47,10 +47,31 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
         {
             ray scattered;
             vec3 attenuation;
-            vec3 emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
+            vec3 emitted = rec.mat_ptr->emitted(r, rec, rec.u, rec.v, rec.p);
             float pdf;
             if(rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, pdf, local_rand_state)) 
             {
+                /* 这种必须反射到光源（内部反射则直接返回）的方法，缺点是背向光源的物体几乎纯黑 */
+                // 计算朝向光源的反射向量
+                vec3 on_light = vec3(random_float(local_rand_state) * (343 - 213) + 213, 554,
+                                    random_float(local_rand_state) * (332 - 227) + 227);
+                vec3 to_light = on_light - rec.p;
+                float distance_squared = to_light.length_squared();
+                to_light.make_unit_vector();
+                if (dot(to_light, rec.normal) < 0)
+                {
+                    return i == 0 ? emitted : (cur_emitted + cur_attenuation * emitted);
+                }
+                // 计算反射向量与光源的余弦值
+                float light_area = (343 - 213) * (332 - 227);
+                float light_cosine = abs(to_light.y());
+                if (light_cosine < 0.000001)
+                {
+                    return i == 0 ? emitted : (cur_emitted + cur_attenuation * emitted);
+                }
+                // 修改pdf和scattered
+                pdf = distance_squared / (light_cosine * light_area);
+                scattered = ray(rec.p, to_light, r.time());
                 cur_emitted = cur_emitted + cur_attenuation * emitted;
                 cur_attenuation = cur_attenuation * attenuation * rec.mat_ptr->scattering_pdf(r, rec, scattered) / pdf;
                 cur_ray = scattered;
@@ -141,12 +162,13 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
         material* ima = new lambertian(new image_texture(d_texture_data, d_inxyn[0], d_inxyn[1]));
         material* noise = new lambertian(new noise_texture(&local_rand_state, 0.2));
 
-        d_list[0] = new flip_face(new yz_rect(green, 0, 555, 0, 555, 555));
-        d_list[1] = new yz_rect(red, 0, 555, 0, 555, 0);
+        d_list[0] = new flip_face(new yz_rect(green, 0, 555, 0, 555, 555)); // green
+        d_list[1] = new yz_rect(red, 0, 555, 0, 555, 0);    // red
+        // flip_face的作用是保证光源朝下
         d_list[2] = new flip_face(new xz_rect(light, 213, 343, 227, 332, 554));    // 光源 (150, 400, 150, 400, 554)
-        d_list[3] = new xz_rect(white, 0, 555, 0, 555, 0);
-        d_list[4] = new flip_face(new xz_rect(white, 0, 555, 0, 555, 555));
-        d_list[5] = new flip_face(new xy_rect(white, 0, 555, 0, 555, 555));
+        d_list[3] = new xz_rect(white, 0, 555, 0, 555, 0);  // white
+        d_list[4] = new flip_face(new xz_rect(white, 0, 555, 0, 555, 555)); // white
+        d_list[5] = new flip_face(new xy_rect(white, 0, 555, 0, 555, 555)); // white
 
         // 先旋转再平移，否则无法得到正确的位置（原因：旋转轴是坐标轴y，所以需要将想作为旋转轴的线与坐标轴重合）
         hittable* box1 = new box(white, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
@@ -194,7 +216,7 @@ int main()
 {
     const int nx = 1200;
     const int ny = 1200;
-    const int ns = 200;     // 每个像素内样点数(抗锯齿)
+    const int ns = 10;     // 每个像素内样点数(抗锯齿)
     int tx = 16, ty = 16;
 
     cerr << "Rendering a " << nx << "x" << ny << " image with " << ns << " samples per pixel ";
@@ -224,7 +246,7 @@ int main()
     // string不能转换成const char*
     //string image_name = "IMG_20200910_000256.jpg"
     //"60847663_p0.jpg"
-    unsigned char* texture_data = stbi_load("IMG_20200910_000256.jpg", &inx, &iny, &inn, 0);
+    unsigned char* texture_data = stbi_load("60847663_p0.jpg", &inx, &iny, &inn, 0);
     unsigned char* d_texture_data;
     // 复制图像
     checkCudaErrors(cudaMallocManaged(&d_texture_data, inx * iny * inn * sizeof(unsigned char)));

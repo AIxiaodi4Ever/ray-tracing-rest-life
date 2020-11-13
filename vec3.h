@@ -46,6 +46,12 @@ public:
         return e[0] * e[0] + e[1] * e[1] + e[2] * e[2];
     }
 
+    __host__ __device__ vec3& make_unit_vector()
+    {
+        *this /= length();
+        return *this;
+    }
+
 public:
     float e[3];
 };

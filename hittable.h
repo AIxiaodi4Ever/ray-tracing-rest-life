@@ -46,7 +46,8 @@ public:
     material *mat_ptr;
 };
 
-// 将表面反转，暂时不知道作用
+// 将front_face取反，这样原本设置的面向x，y，z的正方向的面现在被认为面向x，y，z的负方向
+// 在diffuse_light类中，用于设置光源只向front_face为true的面发光
 class flip_face : public hittable
 {
 public:
@@ -59,7 +60,6 @@ public:
         if (!ptr->hit(r, t_min, t_max, rec))
             return false;
 
-        // hit函数已经设置了rec.normal，所以这里将front_face取反不知道有什么意义
         rec.front_face = !rec.front_face;
         return true;
     }
