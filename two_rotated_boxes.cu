@@ -14,6 +14,7 @@
 #include "hittable_list.h"
 #include "camera.h"
 #include "material.h"
+#include "pdf.h"
 
 using namespace std;
 
@@ -48,32 +49,15 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
             ray scattered;
             vec3 attenuation;
             vec3 emitted = rec.mat_ptr->emitted(r, rec, rec.u, rec.v, rec.p);
-            float pdf;
-            if(rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, pdf, local_rand_state)) 
+            float pdf_val;
+            if(rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, pdf_val, local_rand_state)) 
             {
-                /* 这种必须反射到光源（内部反射则直接返回）的方法，缺点是背向光源的物体几乎纯黑 */
-                // 计算朝向光源的反射向量
-                vec3 on_light = vec3(random_float(local_rand_state) * (343 - 213) + 213, 554,
-                                    random_float(local_rand_state) * (332 - 227) + 227);
-                vec3 to_light = on_light - rec.p;
-                float distance_squared = to_light.length_squared();
-                to_light.make_unit_vector();
-                if (dot(to_light, rec.normal) < 0)
-                {
-                    return i == 0 ? emitted : (cur_emitted + cur_attenuation * emitted);
-                }
-                // 计算反射向量与光源的余弦值
-                float light_area = (343 - 213) * (332 - 227);
-                float light_cosine = abs(to_light.y());
-                if (light_cosine < 0.000001)
-                {
-                    return i == 0 ? emitted : (cur_emitted + cur_attenuation * emitted);
-                }
                 // 修改pdf和scattered
-                pdf = distance_squared / (light_cosine * light_area);
-                scattered = ray(rec.p, to_light, r.time());
+                cosine_pdf p(rec.normal);
+                scattered = ray(rec.p, p.generate(local_rand_state), r.time());
+                pdf_val = p.value(scattered.direction());
                 cur_emitted = cur_emitted + cur_attenuation * emitted;
-                cur_attenuation = cur_attenuation * attenuation * rec.mat_ptr->scattering_pdf(r, rec, scattered) / pdf;
+                cur_attenuation = cur_attenuation * attenuation * rec.mat_ptr->scattering_pdf(r, rec, scattered) / pdf_val;
                 cur_ray = scattered;
                 // 测试反射率，早点结束，不然文件很大打不开
                 /*printf("attenuation: %f, %f, %f\n", attenuation[0], attenuation[1], attenuation[2]);

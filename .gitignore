@@ -43,3 +43,8 @@
 # ohters with cuda
 *.exp
 *.zip
+
+two_noise_texture.cu
+implicit_func.h
+
+stb-master
