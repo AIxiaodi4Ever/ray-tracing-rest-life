@@ -53,7 +53,11 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
             if(rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, pdf_val, local_rand_state)) 
             {
                 // 修改pdf和scattered
-                hittable_pdf p(*light_shape, rec.p);
+                hittable_pdf p0(*light_shape, rec.p);
+                cosine_pdf p1(rec.normal);
+                mixture_pdf p(&p0, &p1);
+
+                // 这里确定反射方向，是否反射向内部是通过rec.mat_ptr->scattering_pdf进行检测的，如果反射向内部，则返回0
                 scattered = ray(rec.p, p.generate(local_rand_state), r.time());
                 pdf_val = p.value(scattered.direction());
                 cur_emitted = cur_emitted + cur_attenuation * emitted;
@@ -152,7 +156,7 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
         d_list[2] = new flip_face(new xz_rect(light, 213, 343, 227, 332, 554));    // 光源 (150, 400, 150, 400, 554)
         d_list[3] = new xz_rect(white, 0, 555, 0, 555, 0);  // white
         d_list[4] = new flip_face(new xz_rect(white, 0, 555, 0, 555, 555)); // white
-        d_list[5] = new flip_face(new xy_rect(white, 0, 555, 0, 555, 555)); // white
+        d_list[5] = new flip_face(new xy_rect(ima, 0, 555, 0, 555, 555)); // white
 
         // 先旋转再平移，否则无法得到正确的位置（原因：旋转轴是坐标轴y，所以需要将想作为旋转轴的线与坐标轴重合）
         hittable* box1 = new box(white, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
@@ -187,17 +191,18 @@ __global__ void create_light_shape(hittable **light_shape)
     *light_shape = new xz_rect(0, 213, 343, 227, 332, 554);
 }
 
-__global__ void free_world(hittable **d_list, hittable **d_world, camera **d_camera)
+__global__ void free_world(hittable **d_list, hittable **d_world, camera **d_camera, hittable **light_shape)
 {
     if (threadIdx.x == 0 && blockIdx.x == 0) 
     {
-        /*for (int i = 0; i < 6; ++i)
+        /*for (int i = 0; i < 8; ++i)
         {
-            //delete d_list[i]->mat_ptr;
+            delete d_list[i]->mat_ptr;
             delete d_list[i];
         }*/
         delete *d_world;
         delete *d_camera;
+        delete *light_shape;
     }
 }
 
@@ -205,7 +210,7 @@ int main()
 {
     const int nx = 1200;
     const int ny = 1200;
-    const int ns = 10;     // 每个像素内样点数(抗锯齿)
+    const int ns = 100;     // 每个像素内样点数(抗锯齿)
     int tx = 16, ty = 16;
 
     cerr << "Rendering a " << nx << "x" << ny << " image with " << ns << " samples per pixel ";
@@ -297,7 +302,7 @@ int main()
 
     // clean up
     checkCudaErrors(cudaDeviceSynchronize());
-    free_world<<<1,1>>>(d_list, d_world, d_camera);
+    free_world<<<1,1>>>(d_list, d_world, d_camera, light_shape);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
     checkCudaErrors(cudaFree(d_list));
