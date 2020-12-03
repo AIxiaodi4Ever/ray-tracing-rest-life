@@ -58,6 +58,21 @@ public:
         return true;
     }
 
+    __device__ virtual float pdf_value(const vec3& origin, const vec3& v) const {
+        hit_record rec;
+        if (!this->hit(ray(origin, v), 0.001, MY_INFINITY, rec))
+            return 0;
+        float area = (x1-x0)*(z1-z0);
+        float distance_squared = rec.t * rec.t * v.length_squared();
+        float cosine = fabs(dot(v, rec.normal) / v.length());
+        return distance_squared / (cosine * area);
+    }
+
+    __device__ virtual vec3 random(const vec3& origin, curandState *local_rand_state) const {
+        vec3 random_point = vec3(x0 + (x1 - x0) * random_float(local_rand_state), k, z0 + (z1 - z0) * random_float(local_rand_state));
+        return random_point - origin;
+    }
+
 public:
     float x0, x1, z0, z1, k;
 };

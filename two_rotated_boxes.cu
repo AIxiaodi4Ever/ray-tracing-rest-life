@@ -36,7 +36,7 @@ void check_cuda(cudaError_t result, const char *const func, const char *const fi
 // it was blowing up the stack, so we have to turn this into a
 // limited-depth loop instead.  Later code in the book limits to a max
 // depth of 50, so we adapt this a few chapters early on the GPU.
-__device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_world, curandState *local_rand_state)
+__device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_world, hittable **light_shape, curandState *local_rand_state)
 {
     ray cur_ray = r;
     vec3 cur_attenuation = vec3(1.0, 1.0, 1.0);
@@ -53,7 +53,7 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
             if(rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, pdf_val, local_rand_state)) 
             {
                 // ÐÞ¸ÄpdfºÍscattered
-                cosine_pdf p(rec.normal);
+                hittable_pdf p(*light_shape, rec.p);
                 scattered = ray(rec.p, p.generate(local_rand_state), r.time());
                 pdf_val = p.value(scattered.direction());
                 cur_emitted = cur_emitted + cur_attenuation * emitted;
@@ -100,7 +100,7 @@ __global__ void render_init(int max_x, int max_y, curandState *rand_state)
 }
 
 __global__ void render(vec3 *fb, int max_x, int max_y, int ns, camera **cam,
-                hittable **d_world, curandState *rand_state)
+                hittable **d_world, hittable **light_shape, curandState *rand_state)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
@@ -114,7 +114,7 @@ __global__ void render(vec3 *fb, int max_x, int max_y, int ns, camera **cam,
         float u = float(i + curand_uniform(&local_rand_state)) / float(max_x);
         float v = float(j + curand_uniform(&local_rand_state)) / float(max_y);
         ray r = (*cam)->get_ray(u, v, &local_rand_state);
-        col += ray_color(r, background, d_world, &local_rand_state);
+        col += ray_color(r, background, d_world, light_shape, &local_rand_state);
     }
     rand_state[pixel_index] = local_rand_state;
     col /= float(ns);
@@ -180,6 +180,11 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
                                  0.0,
                                  1.0);
     }
+}
+
+__global__ void create_light_shape(hittable **light_shape)
+{
+    *light_shape = new xz_rect(0, 213, 343, 227, 332, 554);
 }
 
 __global__ void free_world(hittable **d_list, hittable **d_world, camera **d_camera)
@@ -254,6 +259,11 @@ int main()
     create_world<<<1, 1>>>(d_list, d_world, d_camera, nx, ny, d_rand_state2, d_texture_data, d_inxyn);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
+    hittable **light_shape;
+    checkCudaErrors(cudaMallocManaged(&light_shape, sizeof(hittable *)));
+    create_light_shape<<<1, 1>>>(light_shape);
+    checkCudaErrors(cudaGetLastError());
+    checkCudaErrors(cudaDeviceSynchronize());
 
     clock_t start, stop;
     start = clock();
@@ -263,7 +273,7 @@ int main()
     render_init<<<blocks, threads>>>(nx, ny, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
-    render<<<blocks, threads>>>(fb, nx, ny, ns, d_camera, d_world, d_rand_state);
+    render<<<blocks, threads>>>(fb, nx, ny, ns, d_camera, d_world, light_shape, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
     stop = clock();
