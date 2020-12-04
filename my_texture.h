@@ -80,7 +80,7 @@ public:
     __device__ ~image_texture() 
     {
         delete data;
-    }       
+    }
 
     __device__ virtual vec3 value(float u, float v, const vec3& p) const 
     {

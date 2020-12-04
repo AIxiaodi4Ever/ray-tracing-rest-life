@@ -41,13 +41,12 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
     ray cur_ray = r;
     vec3 cur_attenuation = vec3(1.0, 1.0, 1.0);
     vec3 cur_emitted = vec3(0, 0, 0);
-    // 下面是循环中需要的量，这里放在外面声明
-    scatter_record srec;
     for(int i = 0; i < 50; i++) 
     {
         hit_record rec;
         if ((*d_world)->hit(cur_ray, 0.001f, FLT_MAX, rec)) 
         {
+            scatter_record srec;
             float pdf_val;
             vec3 emitted = rec.mat_ptr->emitted(cur_ray, rec, rec.u, rec.v, rec.p);
             if(rec.mat_ptr->scatter(cur_ray, rec, srec, local_rand_state)) 
@@ -61,11 +60,14 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
                 else
                 {
                     // 修改pdf和scattered
+                    //hittable_pdf p0(*light_shape, rec.p);
                     hittable_pdf p0(*light_shape, rec.p);
                     mixture_pdf p(&p0, srec.pdf_ptr);
                     // 这里确定反射方向，是否反射向内部是通过rec.mat_ptr->scattering_pdf进行检测的，如果反射向内部，则返回0
                     ray scattered = ray(rec.p, p.generate(local_rand_state), cur_ray.time());
                     pdf_val = p.value(scattered.direction());
+                    // this delete can't ignore, otherwise you will encount CUDA error = 700
+                    delete srec.pdf_ptr;
                     cur_attenuation = cur_attenuation * srec.attenuation * rec.mat_ptr->scattering_pdf(cur_ray, rec, scattered) / pdf_val;
                     cur_ray = scattered;
                 }
@@ -162,7 +164,7 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
         d_list[5] = new flip_face(new xy_rect(ima, 0, 555, 0, 555, 555)); // white
 
         // 先旋转再平移，否则无法得到正确的位置（原因：旋转轴是坐标轴y，所以需要将想作为旋转轴的线与坐标轴重合）
-        hittable* box1 = new box(aluminum, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
+        hittable* box1 = new box(white, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
         box1 = new rotate_y(box1, -18);
         d_list[6] = new translate(box1, vec3(130, 0, 65));  //(130,0,65)
         hittable* box2 = new box(white, vec3(0, 0, 0), vec3(165, 330, 165));      /// (0,0,0) (165,330,165)
