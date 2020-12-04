@@ -49,7 +49,7 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
         if ((*d_world)->hit(cur_ray, 0.001f, FLT_MAX, rec)) 
         {
             float pdf_val;
-            vec3 emitted = rec.mat_ptr->emitted(r, rec, rec.u, rec.v, rec.p);
+            vec3 emitted = rec.mat_ptr->emitted(cur_ray, rec, rec.u, rec.v, rec.p);
             if(rec.mat_ptr->scatter(cur_ray, rec, srec, local_rand_state)) 
             {
                 cur_emitted = cur_emitted + cur_attenuation * emitted;
@@ -64,9 +64,9 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
                     hittable_pdf p0(*light_shape, rec.p);
                     mixture_pdf p(&p0, srec.pdf_ptr);
                     // 这里确定反射方向，是否反射向内部是通过rec.mat_ptr->scattering_pdf进行检测的，如果反射向内部，则返回0
-                    ray scattered = ray(rec.p, p.generate(local_rand_state), r.time());
+                    ray scattered = ray(rec.p, p.generate(local_rand_state), cur_ray.time());
                     pdf_val = p.value(scattered.direction());
-                    cur_attenuation = cur_attenuation * srec.attenuation * rec.mat_ptr->scattering_pdf(r, rec, scattered) / pdf_val;
+                    cur_attenuation = cur_attenuation * srec.attenuation * rec.mat_ptr->scattering_pdf(cur_ray, rec, scattered) / pdf_val;
                     cur_ray = scattered;
                 }
             }
