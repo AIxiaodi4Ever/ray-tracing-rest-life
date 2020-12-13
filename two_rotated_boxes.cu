@@ -36,7 +36,7 @@ void check_cuda(cudaError_t result, const char *const func, const char *const fi
 // it was blowing up the stack, so we have to turn this into a
 // limited-depth loop instead.  Later code in the book limits to a max
 // depth of 50, so we adapt this a few chapters early on the GPU.
-__device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_world, hittable **shape, curandState *local_rand_state)
+__device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_world, hittable **shape_list, curandState *local_rand_state)
 {
     ray cur_ray = r;
     vec3 cur_attenuation = vec3(1.0, 1.0, 1.0);
@@ -61,7 +61,7 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
                 {
                     // 修改pdf和scattered
                     //hittable_pdf p0(*light_shape, rec.p);
-                    hittable_pdf p0(shape[0], rec.p);
+                    hittable_pdf p0(*shape_list, rec.p);
                     mixture_pdf p(&p0, srec.pdf_ptr);
                     // 这里确定反射方向，是否反射向内部是通过rec.mat_ptr->scattering_pdf进行检测的，如果反射向内部，则返回0
                     ray scattered = ray(rec.p, p.generate(local_rand_state), cur_ray.time());
@@ -107,7 +107,7 @@ __global__ void render_init(int max_x, int max_y, curandState *rand_state)
 }
 
 __global__ void render(vec3 *fb, int max_x, int max_y, int ns, camera **cam,
-                hittable **d_world, hittable **shape, curandState *rand_state)
+                hittable **d_world, hittable **shape_list, curandState *rand_state)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
@@ -121,7 +121,18 @@ __global__ void render(vec3 *fb, int max_x, int max_y, int ns, camera **cam,
         float u = float(i + curand_uniform(&local_rand_state)) / float(max_x);
         float v = float(j + curand_uniform(&local_rand_state)) / float(max_y);
         ray r = (*cam)->get_ray(u, v, &local_rand_state);
-        col += ray_color(r, background, d_world, shape, &local_rand_state);
+        vec3 temp = ray_color(r, background, d_world, shape_list, &local_rand_state);
+        /* 消除NaN */
+        // 必须在这里消除，否则累加后再赋值0.0只能得到黑色的噪点
+        // 但这里只能解决NaN导致的黑色噪点，解决不了白色噪点
+        if (!(temp[0] == temp[0])) temp[0] = 0.0;
+        if (!(temp[1] == temp[1])) temp[1] = 0.0;
+        if (!(temp[2] == temp[2])) temp[2] = 0.0;
+        // 下面解决无穷大导致的白色噪点，100是随便设的，应该只要大于光源的值就行
+        if (temp[0] > 100)  temp[0] = 0.0;
+        if (temp[1] > 100)  temp[1] = 0.0;
+        if (temp[2] > 100)  temp[2] = 0.0;
+        col += temp;
     }
     rand_state[pixel_index] = local_rand_state;
     col /= float(ns);
@@ -171,10 +182,9 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
         d_list[6] = new translate(box1, vec3(130, 0, 65));  //(130,0,65)*/
         //hittable *sphere = new sphere(aluminum, vec3(190, 90, 190), 90);
         d_list[6] = new sphere(glass, vec3(190, 90, 190), 90);
-        hittable* box2 = new box(white, vec3(0, 0, 0), vec3(165, 330, 165));      /// (0,0,0) (165,330,165)
+        hittable* box2 = new box(glass, vec3(0, 0, 0), vec3(165, 330, 165));      /// (0,0,0) (165,330,165)
         box2 = new rotate_y(box2, 15);
         d_list[7] = new translate(box2, vec3(265, 0, 295)); // (265,0,295)
-        //d_list[3] = new moving_sphere(noise, vec3(300, 300, 300), vec3(300, 300, 300), 0, 1, 80);
 
         *rand_state = local_rand_state;
         *d_world  = new hittable_list(d_list, 8);
@@ -195,10 +205,11 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
     }
 }
 
-__global__ void create_shape(hittable **shape, int num_shape)
+__global__ void create_shape(hittable **shape, hittable **shape_list, int num_shape)
 {
     shape[0] = new xz_rect(0, 213, 343, 227, 332, 554);
     shape[1] = new sphere(0, vec3(190, 90, 190), 90);
+    *shape_list = new hittable_list(shape, 2);
 }
 
 __global__ void free_world(hittable **d_list, hittable **d_world, camera **d_camera, hittable **shape)
@@ -220,7 +231,7 @@ int main()
 {
     const int nx = 1200;
     const int ny = 1200;
-    const int ns = 100;     // 每个像素内样点数(抗锯齿)
+    const int ns = 1000;     // 每个像素内样点数(抗锯齿)
     int tx = 16, ty = 16;
 
     cerr << "Rendering a " << nx << "x" << ny << " image with " << ns << " samples per pixel ";
@@ -279,7 +290,7 @@ int main()
     int num_shape = 2;
     checkCudaErrors(cudaMallocManaged(&shape, num_shape * sizeof(hittable *)));
     checkCudaErrors(cudaMallocManaged(&shape_list, sizeof(hittable *))); 
-    create_shape<<<1, 1>>>(shape, num_shape);
+    create_shape<<<1, 1>>>(shape, shape_list, num_shape);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
@@ -291,7 +302,7 @@ int main()
     render_init<<<blocks, threads>>>(nx, ny, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
-    render<<<blocks, threads>>>(fb, nx, ny, ns, d_camera, d_world, shape, d_rand_state);
+    render<<<blocks, threads>>>(fb, nx, ny, ns, d_camera, d_world, shape_list, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
     stop = clock();
@@ -306,9 +317,9 @@ int main()
         for (int i = 0; i < nx; ++i)
         {
             size_t pixel_index = j * nx + i;
-            int ir = int(255.99 * fb[pixel_index].x());
-            int ig = int(255.99 * fb[pixel_index].y());
-            int ib = int(255.99 * fb[pixel_index].z());
+            int ir = int(255.99 * clamp(fb[pixel_index].x(), 0.0, 0.999));
+            int ig = int(255.99 * clamp(fb[pixel_index].y(), 0.0, 0.999));
+            int ib = int(255.99 * clamp(fb[pixel_index].z(), 0.0, 0.999));
             cout << ir << " " << ig << " " << ib << "\n";
         }
     }

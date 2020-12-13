@@ -65,4 +65,22 @@ __device__ bool hittable_list::bounding_box(float t0, float t1, aabb &output_box
     return true;
 }
 
+__device__ float hittable_list::pdf_value(const vec3& o, const vec3& v) const
+{
+    float weight = 1.0 / list_size;
+    float sum = 0.0;
+
+    for (int i = 0; i < list_size; ++i)
+    {
+        sum += weight * list[i]->pdf_value(o, v);
+    }
+    return sum;
+}
+
+__device__ vec3 hittable_list::random(const vec3& o, curandState *local_rand_state) const
+{
+    int random_index = (int)(random_float(local_rand_state) * (list_size - 1));
+    return list[random_index]->random(o, local_rand_state);
+}
+
 #endif

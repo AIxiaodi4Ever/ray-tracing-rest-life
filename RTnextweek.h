@@ -9,6 +9,15 @@
 
 #define RANDVEC3 vec3(curand_uniform(local_rand_state), curand_uniform(local_rand_state), curand_uniform(local_rand_state))
 
+inline float clamp(float x, float min, float max)
+{
+    if (x < min)
+        return min;
+    if (x > max)
+        return max;
+    return x;
+}
+
 __device__ float degree_to_radians(float angle)
 {
     return M_PI * angle / 180;

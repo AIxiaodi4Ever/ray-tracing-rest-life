@@ -119,6 +119,8 @@ public:
 };
 
 // 电解质（玻璃、水、金刚石等）
+/* 透明介质如球，可以在电解质球内部添加一个半径为负的电解质球实现， 
+*  所以同理其他形状的透明介质只需添加一个尺寸略小的电解质，但每个面的法向量都与原来相反即可*/
 class dielectric : public material {
 public:
     __device__ dielectric(float ri) : ref_idx(ri) {}
