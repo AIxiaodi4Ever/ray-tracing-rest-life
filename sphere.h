@@ -6,6 +6,8 @@
 #define SPHERE_H
 
 #include "hittable.h"
+#include "onb.h"
+#include "pdf.h"
 
 class sphere : public hittable {
 public:
@@ -19,6 +21,10 @@ public:
                           center + vec3(radius, radius, radius));
         return true;
     }
+
+    __device__ virtual float pdf_value(const vec3 &o, const vec3 &v) const;
+
+    __device__ virtual vec3 random(const vec3 &o, curandState *local_rand_state) const;
 
 public:
     vec3 center;
@@ -71,6 +77,25 @@ __device__ bool sphere::hit(const ray &r, float t_min, float t_max, hit_record &
         }
     }
     return false;
+}
+
+__device__ float sphere::pdf_value(const vec3 &o, const vec3 &v) const
+{
+    hit_record rec;
+    if (!this->hit(ray(o, v), 0.001, MY_INFINITY, rec))
+        return 0;
+    float cos_theta_max = sqrt(1 - radius * radius / (center - o).length_squared());
+    float solid_angle = 2 * M_PI * (1 - cos_theta_max);
+    return 1 / solid_angle;
+}
+
+__device__ vec3 sphere::random(const vec3 &o, curandState *local_rand_state) const
+{
+    vec3 direction = center - o;
+    float distance_squared = direction.length_squared();
+    onb uvw;
+    uvw.build_from_w(direction);
+    return uvw.local(random_to_sphere(radius, distance_squared, local_rand_state));
 }
 
 #endif

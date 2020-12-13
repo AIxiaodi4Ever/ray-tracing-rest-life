@@ -36,17 +36,17 @@ void check_cuda(cudaError_t result, const char *const func, const char *const fi
 // it was blowing up the stack, so we have to turn this into a
 // limited-depth loop instead.  Later code in the book limits to a max
 // depth of 50, so we adapt this a few chapters early on the GPU.
-__device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_world, hittable **light_shape, curandState *local_rand_state)
+__device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_world, hittable **shape, curandState *local_rand_state)
 {
     ray cur_ray = r;
     vec3 cur_attenuation = vec3(1.0, 1.0, 1.0);
     vec3 cur_emitted = vec3(0, 0, 0);
+    scatter_record srec;
     for(int i = 0; i < 50; i++) 
     {
         hit_record rec;
         if ((*d_world)->hit(cur_ray, 0.001f, FLT_MAX, rec)) 
         {
-            scatter_record srec;
             float pdf_val;
             vec3 emitted = rec.mat_ptr->emitted(cur_ray, rec, rec.u, rec.v, rec.p);
             if(rec.mat_ptr->scatter(cur_ray, rec, srec, local_rand_state)) 
@@ -61,7 +61,7 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
                 {
                     // 修改pdf和scattered
                     //hittable_pdf p0(*light_shape, rec.p);
-                    hittable_pdf p0(*light_shape, rec.p);
+                    hittable_pdf p0(shape[1], rec.p);
                     mixture_pdf p(&p0, srec.pdf_ptr);
                     // 这里确定反射方向，是否反射向内部是通过rec.mat_ptr->scattering_pdf进行检测的，如果反射向内部，则返回0
                     ray scattered = ray(rec.p, p.generate(local_rand_state), cur_ray.time());
@@ -107,7 +107,7 @@ __global__ void render_init(int max_x, int max_y, curandState *rand_state)
 }
 
 __global__ void render(vec3 *fb, int max_x, int max_y, int ns, camera **cam,
-                hittable **d_world, hittable **light_shape, curandState *rand_state)
+                hittable **d_world, hittable **shape, curandState *rand_state)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
@@ -121,7 +121,7 @@ __global__ void render(vec3 *fb, int max_x, int max_y, int ns, camera **cam,
         float u = float(i + curand_uniform(&local_rand_state)) / float(max_x);
         float v = float(j + curand_uniform(&local_rand_state)) / float(max_y);
         ray r = (*cam)->get_ray(u, v, &local_rand_state);
-        col += ray_color(r, background, d_world, light_shape, &local_rand_state);
+        col += ray_color(r, background, d_world, shape, &local_rand_state);
     }
     rand_state[pixel_index] = local_rand_state;
     col /= float(ns);
@@ -191,12 +191,13 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
     }
 }
 
-__global__ void create_light_shape(hittable **light_shape)
+__global__ void create_shape(hittable **shape, int num_shape)
 {
-    *light_shape = new xz_rect(0, 213, 343, 227, 332, 554);
+    shape[0] = new xz_rect(0, 213, 343, 227, 332, 554);
+    shape[1] = new sphere(0, vec3(190, 90, 190), 90);
 }
 
-__global__ void free_world(hittable **d_list, hittable **d_world, camera **d_camera, hittable **light_shape)
+__global__ void free_world(hittable **d_list, hittable **d_world, camera **d_camera, hittable **shape)
 {
     if (threadIdx.x == 0 && blockIdx.x == 0) 
     {
@@ -207,7 +208,7 @@ __global__ void free_world(hittable **d_list, hittable **d_world, camera **d_cam
         }*/
         delete *d_world;
         delete *d_camera;
-        delete *light_shape;
+        delete *shape;
     }
 }
 
@@ -269,9 +270,10 @@ int main()
     create_world<<<1, 1>>>(d_list, d_world, d_camera, nx, ny, d_rand_state2, d_texture_data, d_inxyn);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
-    hittable **light_shape;
-    checkCudaErrors(cudaMallocManaged(&light_shape, sizeof(hittable *)));
-    create_light_shape<<<1, 1>>>(light_shape);
+    hittable **shape;
+    int num_shape = 2;
+    checkCudaErrors(cudaMallocManaged(&shape, num_shape * sizeof(hittable *)));
+    create_shape<<<1, 1>>>(shape, num_shape);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
@@ -283,7 +285,7 @@ int main()
     render_init<<<blocks, threads>>>(nx, ny, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
-    render<<<blocks, threads>>>(fb, nx, ny, ns, d_camera, d_world, light_shape, d_rand_state);
+    render<<<blocks, threads>>>(fb, nx, ny, ns, d_camera, d_world, shape, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
     stop = clock();
@@ -307,7 +309,7 @@ int main()
 
     // clean up
     checkCudaErrors(cudaDeviceSynchronize());
-    free_world<<<1,1>>>(d_list, d_world, d_camera, light_shape);
+    free_world<<<1,1>>>(d_list, d_world, d_camera, shape);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
     checkCudaErrors(cudaFree(d_list));
