@@ -61,7 +61,7 @@ __device__ vec3 ray_color(const ray& r, const vec3& background, hittable **d_wor
                 {
                     // 修改pdf和scattered
                     //hittable_pdf p0(*light_shape, rec.p);
-                    hittable_pdf p0(shape[1], rec.p);
+                    hittable_pdf p0(shape[0], rec.p);
                     mixture_pdf p(&p0, srec.pdf_ptr);
                     // 这里确定反射方向，是否反射向内部是通过rec.mat_ptr->scattering_pdf进行检测的，如果反射向内部，则返回0
                     ray scattered = ray(rec.p, p.generate(local_rand_state), cur_ray.time());
@@ -155,6 +155,8 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
 
         material* aluminum = new metal(vec3(0.8, 0.85, 0.88), 0.0);
 
+        material* glass = new dielectric(3);
+
         d_list[0] = new flip_face(new yz_rect(green, 0, 555, 0, 555, 555)); // green
         d_list[1] = new yz_rect(red, 0, 555, 0, 555, 0);    // red
         // flip_face的作用是保证光源朝下
@@ -164,9 +166,11 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
         d_list[5] = new flip_face(new xy_rect(ima, 0, 555, 0, 555, 555)); // white
 
         // 先旋转再平移，否则无法得到正确的位置（原因：旋转轴是坐标轴y，所以需要将想作为旋转轴的线与坐标轴重合）
-        hittable* box1 = new box(white, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
+        /*hittable* box1 = new box(white, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
         box1 = new rotate_y(box1, -18);
-        d_list[6] = new translate(box1, vec3(130, 0, 65));  //(130,0,65)
+        d_list[6] = new translate(box1, vec3(130, 0, 65));  //(130,0,65)*/
+        //hittable *sphere = new sphere(aluminum, vec3(190, 90, 190), 90);
+        d_list[6] = new sphere(glass, vec3(190, 90, 190), 90);
         hittable* box2 = new box(white, vec3(0, 0, 0), vec3(165, 330, 165));      /// (0,0,0) (165,330,165)
         box2 = new rotate_y(box2, 15);
         d_list[7] = new translate(box2, vec3(265, 0, 295)); // (265,0,295)
@@ -271,8 +275,10 @@ int main()
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
     hittable **shape;
+    hittable **shape_list;
     int num_shape = 2;
     checkCudaErrors(cudaMallocManaged(&shape, num_shape * sizeof(hittable *)));
+    checkCudaErrors(cudaMallocManaged(&shape_list, sizeof(hittable *))); 
     create_shape<<<1, 1>>>(shape, num_shape);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());

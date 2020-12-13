@@ -17,6 +17,10 @@ public:
     __device__ virtual bool hit(const ray &r, float t_min, float t_max, hit_record &rec) const;
     __device__ virtual bool bounding_box(float t0, float t1, aabb &output_box) const;
 
+    __device__ virtual float pdf_value(const vec3& o, const vec3& v) const;
+
+    __device__ virtual vec3 random(const vec3& o, curandState *local_rand_state) const;
+
 public:
     hittable **list;
     int list_size;

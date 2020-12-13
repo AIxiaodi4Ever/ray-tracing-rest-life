@@ -125,7 +125,7 @@ public:
 
     __device__ virtual bool scatter(const ray &r_in, const hit_record &rec, scatter_record& srec, curandState *local_rand_state) const
     {   // 与光线在同一侧的法向量
-        /*vec3 outward_normal;
+        vec3 outward_normal;
         vec3 reflected = reflect(r_in.direction(), rec.normal);
         float ni_over_nt;
         srec.attenuation = vec3(1.0, 1.0, 1.0);
@@ -150,9 +150,10 @@ public:
         else
             reflect_prob = 1.0f;
         if (curand_uniform(local_rand_state) < reflect_prob)
-            scattered = ray(rec.p, reflected, r_in.time());
+            srec.specular_ray = ray(rec.p, reflected, r_in.time());
         else
-            scattered = ray(rec.p, refracted, r_in.time());*/
+            srec.specular_ray = ray(rec.p, refracted, r_in.time());
+        srec.is_specular = true;
         return true;
     }
 
