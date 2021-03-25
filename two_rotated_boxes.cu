@@ -168,10 +168,10 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
 
         material* glass = new dielectric(3);
 
-        d_list[0] = new flip_face(new yz_rect(green, 0, 555, 0, 555, 555)); // green
-        d_list[1] = new yz_rect(red, 0, 555, 0, 555, 0);    // red
+        d_list[0] = new flip_face(new yz_rect(aluminum, 0, 555, 0, 555, 555)); // green
+        d_list[1] = new yz_rect(aluminum, 0, 555, 0, 555, 0);    // red
         // flip_face的作用是保证光源朝下
-        d_list[2] = new flip_face(new xz_rect(light, 213, 343, 227, 332, 554));    // 光源 (150, 400, 150, 400, 554)
+        d_list[2] = new flip_face(new xz_rect(aluminum, 213, 343, 227, 332, 554));    // 光源 (150, 400, 150, 400, 554)
         d_list[3] = new xz_rect(white, 0, 555, 0, 555, 0);  // white
         d_list[4] = new flip_face(new xz_rect(white, 0, 555, 0, 555, 555)); // white
         d_list[5] = new flip_face(new xy_rect(ima, 0, 555, 0, 555, 555)); // white
@@ -191,8 +191,8 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
 
         vec3 lookfrom(278, 278, -800);  // 278, 278, -800
         vec3 lookat(278 , 278, 0);
-        float dist_to_focus = 10; (lookfrom-lookat).length();
-        float aperture = 0; //0.1
+        float dist_to_focus = 555; (lookfrom-lookat).length();
+        float aperture = 0.5; //0.1
         *d_camera   = new camera(lookfrom,
                                  lookat,
                                  vec3(0,1,0),
@@ -231,7 +231,7 @@ int main()
 {
     const int nx = 1200;
     const int ny = 1200;
-    const int ns = 1000;     // 每个像素内样点数(抗锯齿)
+    const int ns = 10;     // 每个像素内样点数(抗锯齿)
     int tx = 16, ty = 16;
 
     cerr << "Rendering a " << nx << "x" << ny << " image with " << ns << " samples per pixel ";

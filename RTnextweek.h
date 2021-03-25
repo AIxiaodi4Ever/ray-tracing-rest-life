@@ -18,6 +18,29 @@ inline float clamp(float x, float min, float max)
     return x;
 }
 
+__device__ float pow(float num, int n)
+{
+    if (num == 0 && n <= 0)
+    {
+        exit(1);
+    }
+    if (n == 0)
+        return 1;
+    float temp = 1, origNum = num;
+    while (n != 1)
+    {
+        if (n & 1)
+        {
+            num *= num;
+            temp = temp * origNum;
+        }
+        else
+            num *= num;
+        n /= 2;
+    }
+    return num * temp;
+}
+
 __device__ float degree_to_radians(float angle)
 {
     return M_PI * angle / 180;

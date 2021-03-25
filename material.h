@@ -13,11 +13,13 @@ __device__ float schlick(float cosine, float ref_idx)
 {
     auto r0 = (1 - ref_idx) / (1 + ref_idx);
     r0 = r0 * r0;
-    return r0 * (1 - r0) * pow(1 - cosine, 5);
+    //return r0 * (1.0f - r0) * pow(1.0f - cosine, 5);
+    float temp = 1.0f - cosine;
+    return r0 * (1.0f - r0) * temp * temp * temp * temp * temp;
 }
 
 // 获得电解质中的折射向量
-__device__ inline bool refract(const vec3& v, const vec3& n, float etai_over_etat, vec3& refracted)
+__device__ __host__ inline bool refract(const vec3& v, const vec3& n, float etai_over_etat, vec3& refracted)
 {
     vec3 uv = unit_vector(v);
     float dt = dot(uv, n);
