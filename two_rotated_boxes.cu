@@ -171,7 +171,7 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
         d_list[0] = new flip_face(new yz_rect(aluminum, 0, 555, 0, 555, 555)); // green
         d_list[1] = new yz_rect(aluminum, 0, 555, 0, 555, 0);    // red
         // flip_face的作用是保证光源朝下
-        d_list[2] = new flip_face(new xz_rect(aluminum, 213, 343, 227, 332, 554));    // 光源 (150, 400, 150, 400, 554)
+        d_list[2] = new flip_face(new xz_rect(light, 213, 343, 227, 332, 554));    // 光源 (150, 400, 150, 400, 554)
         d_list[3] = new xz_rect(white, 0, 555, 0, 555, 0);  // white
         d_list[4] = new flip_face(new xz_rect(white, 0, 555, 0, 555, 555)); // white
         d_list[5] = new flip_face(new xy_rect(ima, 0, 555, 0, 555, 555)); // white
@@ -184,15 +184,15 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
         d_list[6] = new sphere(glass, vec3(190, 90, 190), 90);
         hittable* box2 = new box(glass, vec3(0, 0, 0), vec3(165, 330, 165));      /// (0,0,0) (165,330,165)
         box2 = new rotate_y(box2, 15);
-        d_list[7] = new translate(box2, vec3(265, 0, 295)); // (265,0,295)
+        d_list[7] = new translate(box2, vec3(265, 0.1, 295)); // (265,0,295)
 
         *rand_state = local_rand_state;
         *d_world  = new hittable_list(d_list, 8);
 
         vec3 lookfrom(278, 278, -800);  // 278, 278, -800
         vec3 lookat(278 , 278, 0);
-        float dist_to_focus = 555; (lookfrom-lookat).length();
-        float aperture = 0.5; //0.1
+        float dist_to_focus = 1355; (lookfrom-lookat).length();
+        float aperture = 5.0; //0.1
         *d_camera   = new camera(lookfrom,
                                  lookat,
                                  vec3(0,1,0),
@@ -231,7 +231,7 @@ int main()
 {
     const int nx = 1200;
     const int ny = 1200;
-    const int ns = 10;     // 每个像素内样点数(抗锯齿)
+    const int ns = 777;     // 每个像素内样点数(抗锯齿)
     int tx = 16, ty = 16;
 
     cerr << "Rendering a " << nx << "x" << ny << " image with " << ns << " samples per pixel ";
