@@ -2,6 +2,14 @@
 
 this is a ray-tracing program using CUDA to accelerate up. Modified from Peter Shirly's [ONE-WEEK series](https://github.com/RayTracing/raytracing.github.io).
 
+# Environment
+* windows 10
+* C++ standard library
+* RTX 2060
+* intel i7 10875
+* CUDA 11
+* GPU driver version 27.21.14.5256
+
 # keywords
 * CUDA
 * Mental, Diffuse Materials, Dielectrics.
