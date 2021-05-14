@@ -20,3 +20,9 @@ produce some complicated scenes.
 You can consult the books in the link above for any concepts about ray-tracing.
 
 the pic below is my rendering result. A cornell box whit 1000 ray in one pixel.
+
+*the image that used as image mapping is from a painter named [Atポキ](https://www.pixiv.net/users/50782)*
+
+![lambertian](https://raw.githubusercontent.com/AIxiaodi4Ever/ray-tracing-rest-life/master/cornell_sampling_hittable_list5_first_perfect_picture.png)
+
+![dielectrics](https://raw.githubusercontent.com/AIxiaodi4Ever/ray-tracing-rest-life/master/cornell_sampling_hittable_list12.png)
