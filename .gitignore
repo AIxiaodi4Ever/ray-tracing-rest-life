@@ -39,6 +39,8 @@
 *.ppm
 *.png
 *.jpg
+!cornell_sampling_hittable_list5_first_perfect_picture.png
+!cornell_sampling_hittable_list12.png
 
 # ohters with cuda
 *.exp
