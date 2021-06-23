@@ -166,25 +166,25 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
 
         material* aluminum = new metal(vec3(0.8, 0.85, 0.88), 0.0);
 
-        material* glass = new dielectric(3);
+        //material* glass = new dielectric(3);
 
-        d_list[0] = new flip_face(new yz_rect(aluminum, 0, 555, 0, 555, 555)); // green
-        d_list[1] = new yz_rect(aluminum, 0, 555, 0, 555, 0);    // red
+        d_list[0] = new flip_face(new yz_rect(green, 0, 555, 0, 555, 555)); // green
+        d_list[1] = new yz_rect(red, 0, 555, 0, 555, 0);    // red
         // flip_face的作用是保证光源朝下
         d_list[2] = new flip_face(new xz_rect(light, 213, 343, 227, 332, 554));    // 光源 (150, 400, 150, 400, 554)
         d_list[3] = new xz_rect(white, 0, 555, 0, 555, 0);  // white
         d_list[4] = new flip_face(new xz_rect(white, 0, 555, 0, 555, 555)); // white
-        d_list[5] = new flip_face(new xy_rect(ima, 0, 555, 0, 555, 555)); // white
+        d_list[5] = new flip_face(new xy_rect(white, 0, 555, 0, 555, 555)); // white
 
         // 先旋转再平移，否则无法得到正确的位置（原因：旋转轴是坐标轴y，所以需要将想作为旋转轴的线与坐标轴重合）
-        /*hittable* box1 = new box(white, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
+        hittable* box1 = new box(white, vec3(0, 0, 0), vec3(165, 165, 165));    /// (0,0,0) (165,165,165)
         box1 = new rotate_y(box1, -18);
-        d_list[6] = new translate(box1, vec3(130, 0, 65));  //(130,0,65)*/
+        d_list[6] = new translate(box1, vec3(130, 0, 65));  //(130,0,65)
         //hittable *sphere = new sphere(aluminum, vec3(190, 90, 190), 90);
-        d_list[6] = new sphere(glass, vec3(190, 90, 190), 90);
-        hittable* box2 = new box(glass, vec3(0, 0, 0), vec3(165, 330, 165));      /// (0,0,0) (165,330,165)
+        //d_list[6] = new sphere(glass, vec3(190, 90, 190), 90);
+        hittable* box2 = new box(white, vec3(0, 0, 0), vec3(165, 330, 165));      /// (0,0,0) (165,330,165)
         box2 = new rotate_y(box2, 15);
-        d_list[7] = new translate(box2, vec3(265, 0.1, 295)); // (265,0,295)
+        d_list[7] = new translate(box2, vec3(265, 0.01, 295)); // (265,0,295)
 
         *rand_state = local_rand_state;
         *d_world  = new hittable_list(d_list, 8);
@@ -192,7 +192,7 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
         vec3 lookfrom(278, 278, -800);  // 278, 278, -800
         vec3 lookat(278 , 278, 0);
         float dist_to_focus = 1355; (lookfrom-lookat).length();
-        float aperture = 5.0; //0.1
+        float aperture = 0; //0.1
         *d_camera   = new camera(lookfrom,
                                  lookat,
                                  vec3(0,1,0),
@@ -208,8 +208,8 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
 __global__ void create_shape(hittable **shape, hittable **shape_list, int num_shape)
 {
     shape[0] = new xz_rect(0, 213, 343, 227, 332, 554);
-    shape[1] = new sphere(0, vec3(190, 90, 190), 90);
-    *shape_list = new hittable_list(shape, 2);
+    //shape[1] = new sphere(0, vec3(190, 90, 190), 90);
+    *shape_list = new hittable_list(shape, 1);
 }
 
 __global__ void free_world(hittable **d_list, hittable **d_world, camera **d_camera, hittable **shape)
@@ -231,7 +231,7 @@ int main()
 {
     const int nx = 1200;
     const int ny = 1200;
-    const int ns = 777;     // 每个像素内样点数(抗锯齿)
+    const int ns = 100;     // 每个像素内样点数(抗锯齿)
     int tx = 16, ty = 16;
 
     cerr << "Rendering a " << nx << "x" << ny << " image with " << ns << " samples per pixel ";
@@ -287,7 +287,7 @@ int main()
     checkCudaErrors(cudaDeviceSynchronize());
     hittable **shape;
     hittable **shape_list;
-    int num_shape = 2;
+    int num_shape = 1;
     checkCudaErrors(cudaMallocManaged(&shape, num_shape * sizeof(hittable *)));
     checkCudaErrors(cudaMallocManaged(&shape_list, sizeof(hittable *))); 
     create_shape<<<1, 1>>>(shape, shape_list, num_shape);
